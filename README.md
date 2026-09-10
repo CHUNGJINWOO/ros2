@@ -18,3 +18,17 @@
 
 ### 📌 원격 개발 환경 (VS Code Remote-SSH)
 - **선택 이유**: 원격 서버의 CLI 환경과 로컬 PC의 GUI 편집 편의성 결합
+
+## ☁️ Cloud-Based 원격 개발 환경 아키텍처
+
+본 캡스톤 프로젝트는 로컬 하드웨어(LG Gram)의 성능 한계를 극복하고, 장소에 구애받지 않는 유연한 개발 환경을 위해 **Oracle Cloud Infrastructure(OCI) 기반의 무설치 원격 IDE 환경**을 구축했습니다.
+
+### 🔹 Architecture 요약
+- **Compute Server**: Oracle Cloud Ubuntu 22.04 LTS (ROS2 / LIMO 시뮬레이션 연산 전담)
+- **Web IDE**: `code-server`를 활용한 VS Code 브라우저 렌더링
+- **Network Security**: `Tailscale Funnel`을 이용한 Ingress 통제 및 HTTPS 자동 암호화
+
+### 🔹 도입 배경 및 기술적 이점
+1. **Zero-Install 접속**: 로컬 PC에 특정 프로그램(VS Code, VPN 등)을 설치할 필요 없이 웹 브라우저(Chrome, Edge 등)만으로 즉각적인 개발 환경 접근이 가능합니다.
+2. **보안성 강화 (HTTPS & Auth)**: Tailscale Funnel을 통해 포트 개방 없이 안전한 터널링을 구현하였으며, HTTPS 기반의 통신 암호화와 자체 비밀번호 인증을 통해 공용 네트워크에서의 패킷 스니핑 및 무단 접근을 차단했습니다.
+3. **분산 처리**: 무거운 Gazebo 시뮬레이션 물리 연산과 ROS2 빌드는 클라우드 서버 자원을 활용하고, 로컬 디바이스는 가벼운 시각화 렌더링만 담당하여 하드웨어 병목 현상을 방지했습니다.
