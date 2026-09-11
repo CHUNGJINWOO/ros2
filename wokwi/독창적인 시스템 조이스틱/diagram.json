@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "author": "Anonymous maker",
+  "editor": "wokwi",
+  "parts": [
+    { "type": "wokwi-breadboard-half", "id": "bb1", "top": -51, "left": 166, "attrs": {} },
+    { "type": "wokwi-arduino-mega", "id": "mega", "top": -47.4, "left": -234, "attrs": {} },
+    {
+      "type": "wokwi-analog-joystick",
+      "id": "joystick1",
+      "top": -192.6,
+      "left": 187.8,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    [ "mega:5V", "bb1:bp.1", "red", [ "v74.1", "h271.1" ] ],
+    [ "mega:GND.2", "bb1:bn.2", "black", [ "v83.7", "h280.55" ] ],
+    [ "bb1:bp.25", "bb1:tp.25", "red", [ "v0" ] ],
+    [ "bb1:bn.24", "bb1:tn.24", "black", [ "v0" ] ],
+    [ "joystick1:VCC", "bb1:tp.1", "red", [ "v9.6", "h-19.2" ] ],
+    [ "joystick1:GND", "bb1:tn.11", "black", [ "v9.6", "h57.6" ] ],
+    [ "joystick1:VERT", "mega:A1", "green", [ "v249.6", "h-240" ] ],
+    [ "joystick1:HORZ", "mega:A0", "green", [ "v259.2", "h-268.8", "v-9.6" ] ],
+    [ "joystick1:SEL", "mega:2", "green", [ "v19.2", "h-249.6" ] ]
+  ],
+  "dependencies": {}
+}

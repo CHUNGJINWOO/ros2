@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
 //115p
-
+/*
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
 
@@ -14,6 +14,7 @@ void loop() {
   delay(500);
 
 }
+*/
 
 //117p
 // #define LED_R 12
@@ -56,7 +57,7 @@ void loop() {
 }
 */
 
-/*
+
 //121-122p
 const unsigned int LED0 = 12;
 const unsigned int LED1 = 11;
@@ -108,4 +109,3 @@ void loop() {
   digitalWrite(LED7, LOW);
   delay(interval);
 }
-*/
