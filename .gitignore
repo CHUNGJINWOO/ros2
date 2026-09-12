@@ -9,3 +9,7 @@ __pycache__/
 
 # 디스커버리 서버 및 각종 실행 임시 로그 파일 제외
 *.log
+
+# rclone.conf, Secret Key
+rclone.conf
+*.conf
