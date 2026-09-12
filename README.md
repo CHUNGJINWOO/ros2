@@ -122,3 +122,102 @@ ros2 run demo_nodes_cpp talker
 
 # 로컬 WSL2 터미널 (데이터 수신)
 ros2 run demo_nodes_py listener
+
+# ROS 2 Fast DDS Discovery Server 원격 통신 구축 가이드 (Oracle Cloud & WSL2)
+
+## 1. 개요
+Tailscale 가상 네트워크망을 이용하여 오라클 클라우드 서버와 로컬 노트북(WSL2) 환경 간의 ROS 2 노드 통신을 구축하는 방법입니다. Fast DDS Discovery Server를 활용하여 동적 포트 문제를 해결합니다.
+
+## 2. 오라클 클라우드 서버 설정 (서버 측)
+
+### 2.1. 방화벽 설정
+* 오라클 클라우드 VCN 보안 목록에서 수신 규칙 `TCP/UDP 11811` 포트를 개방합니다.
+
+### 2.2. Fast DDS 자동 실행 서비스 등록 (systemd)
+서버 재부팅 시에도 Discovery Server가 백그라운드에서 자동 실행되도록 설정합니다.
+
+1. 서비스 파일 생성
+```bash
+sudo nano /etc/systemd/system/fastdds.service
+
+[Unit]
+Description=Fast DDS Discovery Server
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+ExecStart=/bin/bash -c "source /opt/ros/humble/setup.bash && fastdds discovery -i 0 -p 11811"
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+
+서비스 활성화 및 실행
+sudo systemctl daemon-reload
+sudo systemctl enable fastdds
+sudo systemctl start fastdds
+
+상태 확인: systemctl status fastdds (active (running) 확인)
+
+자동 실행 등록 확인: systemctl is-enabled fastdds (enabled 확인)
+
+3. 로컬 노트북 설정 (WSL2 클라이언트 측)
+
+3.1. Fast DDS 클라이언트 XML 프로필 설정
+동적 포트 바인딩 문제를 우회하고 서버에 안정적으로 연결하기 위해 클라이언트 프로필을 작성합니다.
+
+XML 파일 생성
+nano ~/fastdds.xml  
+
+아래 내용 입력 후 저장 (서버 IP 및 GUID Prefix 주의)
+<?xml version="1.0" encoding="UTF-8" ?>
+<profiles xmlns="[http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles](http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles)">
+    <participant profile_name="client_profile" is_default_profile="true">
+        <rtps>
+            <builtin>
+                <discovery_config>
+                    <discoveryProtocol>CLIENT</discoveryProtocol>
+                    <discoveryServersList>
+                        <!-- 오라클 서버의 GUID Prefix 입력 -->
+                        <RemoteServer prefix="44.53.00.5f.45.50.52.4f.53.49.49.41">
+                            <metatrafficUnicastLocatorList>
+                                <locator>
+                                    <udpv4>
+                                        <!-- 오라클 서버의 Tailscale IP 및 개방된 포트 입력 -->
+                                        <address>100.127.79.18</address>
+                                        <port>11811</port>
+                                    </udpv4>
+                                </locator>
+                            </metatrafficUnicastLocatorList>
+                        </RemoteServer>
+                    </discoveryServersList>
+                </discovery_config>
+            </builtin>
+        </rtps>
+    </participant>
+</profiles>
+
+3.2. 환경 변수 스위칭 Alias 등록 (.bashrc)
+클라우드망(오라클 서버)과 로컬망(LIMO 등)을 쉽게 전환할 수 있도록 명령어를 등록합니다.
+
+.bashrc 파일 편집
+nano ~/.bashrc
+
+파일 최하단에 아래 내용 추가 (ROS_IP에는 WSL2의 Tailscale IP 입력)
+# ROS 2 Network Switch
+alias cloud_on='export FASTRTPS_DEFAULT_PROFILES_FILE=/home/$(whoami)/fastdds.xml && export ROS_IP="100.66.59.53" && ros2 daemon stop && ros2 daemon start && echo "Cloud Mode ON: 오라클 클라우드로 통신망이 전환되었습니다."'
+alias cloud_off='unset FASTRTPS_DEFAULT_PROFILES_FILE && unset ROS_IP && ros2 daemon stop && ros2 daemon start && echo "Cloud Mode OFF: LIMO 및 로컬 와이파이망으로 전환되었습니다."'
+
+설정 적용
+source ~/.bashrc
+
+4. 통신 테스트
+터미널에 cloud_on을 입력하여 환경 변수 및 XML 프로필을 적용합니다.
+
+수신 측 터미널에서 노드 실행: ros2 run demo_nodes_py listener
+
+송신 측 터미널에서 노드 실행: ros2 run demo_nodes_cpp talker
+
+정상 작동 시 Listener 화면에 "Hello World"가 지속적으로 수신되는지 확인합니다.
