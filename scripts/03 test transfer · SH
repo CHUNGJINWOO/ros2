@@ -1,0 +1,27 @@
+#!/bin/bash
+# =====================================================================
+# 03_test_transfer.sh
+# 실행 위치: 노트북의 WSL2 (Ubuntu)
+# 목적: SSH 키 인증(01번 스크립트) + 블록 볼륨 마운트(02번 스크립트)가
+#       실제로 맞물려 동작하는지, 작은 테스트 파일로 확인한다.
+#       본 자동화(rsync 기반 백업) 이전의 연결 검증 단계.
+# =====================================================================
+ 
+set -e
+ 
+KEY_PATH="$HOME/.ssh/oracle_key"
+ORACLE_HOST="100.127.79.18"    # Tailscale 사설 IP
+REMOTE_PATH="/mnt/data/"
+ 
+TEST_FILE="$HOME/test.txt"
+echo "테스트 파일입니다 - $(date)" > "$TEST_FILE"
+ 
+# scp: SSH 키를 이용해 비밀번호 없이 파일 전송
+#      Tailscale 사설망 IP로 전송하므로 공인 인터넷 구간을 거치지 않는다
+scp -i "$KEY_PATH" "$TEST_FILE" "ubuntu@${ORACLE_HOST}:${REMOTE_PATH}"
+ 
+echo ""
+echo "전송 완료. 오라클 서버에서 아래 명령으로 확인하세요:"
+echo "   ls -l ${REMOTE_PATH}"
+echo "   cat ${REMOTE_PATH}test.txt"
+ 
