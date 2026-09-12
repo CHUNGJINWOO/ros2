@@ -160,3 +160,77 @@ Tailscale IP(`100.127.79.18`)를 통해 SSH 키 인증만으로 비밀번호 없
 
 ---
 
+## Oracle Cloud 백업 인프라 구축
+
+> 아키텍처 배경은 [ARCHITECTURE.md](./ARCHITECTURE.md), 겪은 문제는 [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) 참고
+
+### 1. Tailscale로 사설망 구성
+
+오라클 서버의 SSH 포트를 공인 인터넷에 노출하지 않고, 노트북(WSL)과 클라우드 서버가
+같은 사설망에 있는 것처럼 통신하기 위함. `jinwoo`(Windows), `jinwoo-1`(WSL2),
+`ros2-server`(Oracle) 세 기기가 Tailscale 사설 IP(100.x.x.x 대역)로 연결됨.
+
+### 2. SSH 키 기반 무인 인증
+
+> 코드: [`scripts/01_setup_ssh_key.sh`](../scripts/01_setup_ssh_key.sh)
+
+\`\`\`bash
+ssh-keygen -t ed25519 -f ~/.ssh/oracle_key -N ""
+\`\`\`
+- `-N ""`: 암호 없는 키 — 자동화 스크립트가 사람 개입 없이 실행되기 위한 전제조건
+  (Tailscale 사설망 안에서만 접속 가능해 위험도는 낮춤)
+
+### 3. 블록 볼륨(150GB) 생성 및 마운트
+
+> 코드: [`scripts/02_mount_data_volume.sh`](../scripts/02_mount_data_volume.sh)
+
+Always Free 블록 스토리지 한도 200GB 중 부팅 볼륨(47GB)을 제외한 150GB를 데이터
+전용으로 할당. 콘솔에서 **매개변수 가상화(Paravirtualized)** 방식으로 연결 후:
+
+\`\`\`bash
+sudo mkfs.ext4 /dev/sdb
+sudo mkdir -p /mnt/data && sudo mount /dev/sdb /mnt/data
+sudo blkid /dev/sdb   # UUID 확인
+echo 'UUID="<UUID>" /mnt/data ext4 defaults,nofail 0 2' | sudo tee -a /etc/fstab
+sudo chown ubuntu:ubuntu /mnt/data
+\`\`\`
+
+### 4. 연결 테스트
+
+> 코드: [`scripts/03_test_transfer.sh`](../scripts/03_test_transfer.sh)
+
+\`\`\`bash
+scp -i ~/.ssh/oracle_key ~/test.txt ubuntu@100.127.79.18:/mnt/data/
+\`\`\`
+
+### 5. 오브젝트 스토리지(20GB) rclone 이중 백업
+
+> 코드: [`scripts/04_setup_rclone.sh`](../scripts/04_setup_rclone.sh)
+
+블록 볼륨은 인스턴스가 살아있어야 접근 가능한 반면, 오브젝트 스토리지는 S3 호환
+API로 독립적으로 접근 가능해 완전히 다른 장애 지점을 가진 이중 백업 계층으로 적합.
+
+\`\`\`bash
+rclone config create oracle-obj s3 \\
+    provider=Other env_auth=false \\
+    access_key_id="<Access Key ID>" \\
+    secret_access_key="<Secret Access Key>" \\
+    endpoint="<namespace>.compat.objectstorage.<region>.oraclecloud.com"
+\`\`\`
+보안: Access/Secret Key는 스크립트에 하드코딩하지 않고 실행 시점에 터미널로 직접
+입력받도록 설계 (git에 비밀키가 올라가는 사고 방지).
+
+### 6. 자동화: rsync + rclone 통합
+
+> 코드: [`scripts/05_backup.sh`](../scripts/05_backup.sh)
+
+전체 결과물은 블록 볼륨(주력)으로, `results/important/`의 핵심 파일만 오브젝트
+스토리지로 이중 백업. `--update` 옵션으로 이미 전송된 파일은 재전송하지 않음.
+
+### 7. Windows 작업 스케줄러 등록 — 매일 23:00 자동 실행
+
+> 코드: [`scripts/06_register_task_scheduler.ps1`](../scripts/06_register_task_scheduler.ps1)
+
+WSL2가 꺼지면 내부 cron도 같이 멈추기 때문에, Windows 작업 스케줄러가 `wsl.exe`를
+직접 호출해 필요할 때 WSL을 깨우는 방식을 사용. `-WakeToRun`, `-StartWhenAvailable`
+옵션으로 절전/종료 상태에도 최대한 대응.
