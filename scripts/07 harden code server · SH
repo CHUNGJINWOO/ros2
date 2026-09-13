@@ -1,0 +1,117 @@
+#!/bin/bash
+# =====================================================================
+# 07_harden_code_server.sh
+# Run from: Oracle Cloud server (ros2-server), where code-server runs
+# Purpose: Harden a code-server instance that is exposed to the public
+#          internet via Tailscale Funnel:
+#            1) make code-server log the real client IP (not the proxy's)
+#            2) install fail2ban to auto-block repeated failed logins
+#            3) configure email alerts via Gmail SMTP relay (msmtp),
+#               since most cloud providers block outbound port 25
+#
+# Why this was needed: a code-server instance was found publicly
+# exposed via Tailscale Funnel with only an 8-character password and
+# no lockout mechanism. code-server has no built-in brute-force
+# protection, so this script adds it externally.
+#
+# This script is interactive - it will prompt for your alert email
+# and Gmail App Password rather than hardcoding secrets, so it is
+# safe to keep in a public git repo. It does NOT touch your
+# code-server password - change that yourself first if you haven't:
+#   nano ~/.config/code-server/config.yaml
+# =====================================================================
+ 
+set -e
+ 
+CODE_SERVER_CONFIG="$HOME/.config/code-server/config.yaml"
+CODE_SERVER_SERVICE="code-server@$(whoami).service"
+ 
+echo "== Step 1: enable trust-proxy so code-server logs the real client IP =="
+if [ -f "$CODE_SERVER_CONFIG" ]; then
+    if grep -q "^trust-proxy:" "$CODE_SERVER_CONFIG"; then
+        echo "trust-proxy already set, skipping."
+    else
+        echo "trust-proxy: true" | sudo tee -a "$CODE_SERVER_CONFIG" > /dev/null
+        echo "Added trust-proxy: true to $CODE_SERVER_CONFIG"
+    fi
+else
+    echo "WARNING: $CODE_SERVER_CONFIG not found. Skipping this step -"
+    echo "add 'trust-proxy: true' to your code-server config manually."
+fi
+ 
+echo ""
+echo "== Step 2: install fail2ban and configure the code-server jail =="
+sudo apt install -y fail2ban
+ 
+sudo tee /etc/fail2ban/filter.d/code-server.conf > /dev/null << 'FILTER'
+[Definition]
+failregex = ^.*Failed login attempt \{"remoteAddress":"<HOST>".*$
+ignoreregex =
+FILTER
+ 
+read -p "Alert email address (for ban notifications): " ALERT_EMAIL
+read -p "Max failed attempts before ban [5]: " MAXRETRY
+MAXRETRY=${MAXRETRY:-5}
+read -p "Ban duration, e.g. 1h, 30m [1h]: " BANTIME
+BANTIME=${BANTIME:-1h}
+ 
+sudo tee /etc/fail2ban/jail.d/code-server.conf > /dev/null << JAIL
+[code-server]
+enabled      = true
+filter       = code-server
+backend      = systemd
+journalmatch = _SYSTEMD_UNIT=${CODE_SERVER_SERVICE}
+maxretry     = ${MAXRETRY}
+findtime     = 10m
+bantime      = ${BANTIME}
+action       = %(action_mw)s
+destemail    = ${ALERT_EMAIL}
+JAIL
+ 
+echo ""
+echo "== Step 3: set up Gmail SMTP relay (msmtp) so ban alert emails =="
+echo "   actually get delivered (most cloud providers block direct     "
+echo "   outbound mail on port 25).                                    "
+echo ""
+echo "Before continuing, generate a Gmail App Password at:"
+echo "  https://myaccount.google.com/apppasswords"
+echo "(requires 2-Step Verification enabled on the Google account)"
+echo ""
+read -p "Gmail address to send FROM: " GMAIL_ADDR
+read -s -p "Gmail App Password (16 chars, no spaces): " GMAIL_APP_PW
+echo ""
+ 
+sudo apt install -y msmtp msmtp-mta
+ 
+sudo tee /etc/msmtprc > /dev/null << MSMTP
+defaults
+auth           on
+tls            on
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+logfile        /var/log/msmtp.log
+ 
+account        gmail
+host           smtp.gmail.com
+port           587
+from           ${GMAIL_ADDR}
+user           ${GMAIL_ADDR}
+password       ${GMAIL_APP_PW}
+ 
+account default : gmail
+MSMTP
+ 
+sudo chmod 600 /etc/msmtprc
+ 
+echo ""
+echo "== Step 4: restart services =="
+sudo systemctl restart fail2ban
+ 
+echo ""
+echo "Done. Verify with:"
+echo "  sudo fail2ban-client status code-server"
+echo "  echo -e \"Subject: test\n\ntest message\" | sudo sendmail ${ALERT_EMAIL}"
+echo ""
+echo "REMINDER: /etc/msmtprc now contains your Gmail App Password in plain"
+echo "text. It lives outside this git repo (in /etc/), so it will not be"
+echo "committed - but treat it the same way you'd treat any other secret."
+ 
