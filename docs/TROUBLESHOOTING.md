@@ -55,3 +55,38 @@
 ### Object Storage의 "Region"과 블록 볼륨의 "가용성 도메인(AD)" 혼동
 **증상**: rclone 설정 중 Region란에 `utrK:AP-TOKYO-1-AD-1`(AD 값)을 넣으려 함.
 **해결**: rclone에는 Region 식별자(`ap-tokyo-1`)만 입력. AD는 하위 개념으로 무관.
+
+## code-server 무단 노출 발견 및 보안 강화
+
+> 재현 가능한 전체 절차: [`scripts/07_harden_code_server.sh`](../scripts/07_harden_code_server.sh)
+
+### 발견한 문제
+
+원격 개발 편의를 위해 Tailscale Funnel로 `code-server`(브라우저 기반 VS Code)를
+공인 인터넷에 노출해두고 있었는데, 점검 과정에서 두 가지 문제를 발견했다:
+
+1. **비밀번호가 8자, 소문자+숫자 조합**으로 무차별 대입 공격에 취약
+2. **code-server 자체엔 로그인 시도 횟수 제한(lockout) 기능이 없음** — 즉 비밀번호만
+   뚫리면 방어선이 전혀 없는 상태. code-server는 "서버 전체에 대한 셸 접근"과
+   동일한 권한을 주기 때문에, 일반 웹앱 계정 탈취보다 훨씬 심각한 위험.
+
+### 대응
+
+**1) 비밀번호를 30자 이상의 단어 조합으로 교체**
+무작위 문자열 대신 관련 없는 단어 여러 개를 이어붙이는 방식(diceware 방식)을
+사용해, 기억하기 쉬우면서도 길이로 방어력을 확보했다.
+
+**2) `trust-proxy` 활성화**
+Tailscale Funnel이 `127.0.0.1`로 프록시하기 때문에, 이 설정 없이는 로그인 실패
+로그에 공격자의 실제 IP 대신 항상 로컬 주소만 기록되어 IP 기반 차단이 무의미해짐.
+```yaml
+trust-proxy: true
+```
+
+**3) fail2ban으로 자동 차단 구현**
+code-server가 실패한 로그인을 `Failed login attempt {"remoteAddress":"..."}`
+형식으로 로그에 남긴다는 점을 이용해, 10분 안에 5회 실패 시 해당 IP를 1시간
+차단하는 규칙을 구성했다.
+
+**4) 차단 발생 시 이메일 알림**
+`fail2ban`의
