@@ -43,14 +43,7 @@ cert: false
 # Tailscale Funnel을 이용한 외부 웹 접속 개방
 sudo tailscale funnel 8080
 
-<Steps>
-  <Step subtitle="깃허브 전송" title="3단계: 깃허브(GitHub)에 전체 파일 업로드(커밋 및 푸시)">
-    - 문서 저장을 마친 후, 왼쪽의 **가지 모양 아이콘(소스 제어)**을 누릅니다.
-    - 새로 만든 `docs/SETUP_GUIDE.md`를 포함하여 변경된 모든 파일 옆의 **`+` 기호(변경 내용 스테이징)**를 눌러 위로 올립니다. (단, `build`, `install` 폴더 안의 임시 파일은 제외합니다.)
-    - 메시지 입력 칸에 `docs: 원격 개발 환경 구축 세부 가이드 및 소스 코드 주석 추가`라고 적습니다.
-    - **[커밋 및 동기화]** (또는 푸시) 버튼을 눌러 깃허브에 최종 반영합니다.
-  </Step>
-</Steps>
+
 
 <Elicitations message="구축 가이드 문서 작성 및 깃허브 업로드를 성공적으로 완료하셨습니까?">
   <Elicitation label="빌드 임시 파일 숨기기 (.gitignore)" query="깃허브에 업로드할 때 계속 거슬리는 19개의 build, install 임시 파일들을 안 보이게 숨기는 방법(.gitignore)을 알려줘."/>
