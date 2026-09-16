@@ -1,4 +1,0 @@
-[wokwi]
-version = 1
-firmware = "build/특수 시스템 DIP 스위치.ino.hex"
-elf = "build/특수 시스템 DIP 스위치.ino.elf"

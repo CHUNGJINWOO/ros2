@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+firmware = "build/임베디드 시스템 택트 스위치 풀다운.ino.hex"
+elf = "build/임베디드 시스템 택트 스위치 풀다운.ino.elf"

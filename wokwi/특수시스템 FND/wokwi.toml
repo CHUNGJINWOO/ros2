@@ -1,4 +1,0 @@
-[wokwi]
-version = 1
-firmware = "build/특수시스템 FND.ino.hex"
-elf = "build/특수시스템 FND.ino.elf"

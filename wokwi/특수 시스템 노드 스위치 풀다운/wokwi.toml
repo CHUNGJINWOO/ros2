@@ -1,4 +1,0 @@
-[wokwi]
-version = 1
-firmware = "build/특수 시스템 노드 스위치 풀다운.ino.hex"
-elf = "build/특수 시스템 노드 스위치 풀다운.ino.elf"

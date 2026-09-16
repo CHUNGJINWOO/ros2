@@ -1,4 +1,0 @@
-[wokwi]
-version = 1
-firmware = "build/독창적인 시스템 조이스틱.ino.hex"
-elf = "build/독창적인 시스템 조이스틱.ino.elf"

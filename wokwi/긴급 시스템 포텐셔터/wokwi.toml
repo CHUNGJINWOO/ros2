@@ -1,4 +1,0 @@
-[wokwi]
-version = 1
-firmware = "build/긴급 시스템 포텐셔터.ino.hex"
-elf = "build/긴급 시스템 포텐셔터.ino.elf"
